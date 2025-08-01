@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudOpAI Read-Only Access for GPU Cost Analysis'
+
+Parameters:
+  TrustedAccountId:
+    Type: String
+    Default: 'YOUR_AWS_ACCOUNT_ID'  # Replace with your CloudOpAI account ID
+    Description: CloudOpAI AWS Account ID
+
+Resources:
+  CloudOpAIRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudOpAI-Scanner-Role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${TrustedAccountId}:root'
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref AWS::StackId
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/ReadOnlyAccess'
+      Policies:
+        - PolicyName: CloudOpAIMetricsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'cloudwatch:GetMetricStatistics'
+                  - 'cloudwatch:GetMetricData'
+                  - 'cloudwatch:ListMetrics'
+                Resource: '*'
+
+Outputs:
+  RoleArn:
+    Description: ARN of the created role for CloudOpAI
+    Value: !GetAtt CloudOpAIRole.Arn
+  ExternalId:
+    Description: External ID for additional security
+    Value: !Ref AWS::StackId
