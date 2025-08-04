@@ -1,0 +1,508 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "CloudOpAI GPU Scanner API",
+    "description": "Secure API for GPU cost optimization scanning",
+    "version": "1.0.0",
+    "contact": {
+      "name": "CloudOpAI Support",
+      "email": "support@cloudopai.com",
+      "url": "https://cloudopai.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.cloudopai.com/v1",
+      "description": "Production API"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    },
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/scan": {
+      "post": {
+        "summary": "Initiate GPU cost analysis scan",
+        "description": "Start a comprehensive GPU cost analysis for the specified AWS account",
+        "security": [
+          {
+            "ApiKeyAuth": [],
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-RateLimit-Limit": {
+                "description": "Request limit per time window",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests remaining in current window",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Time when rate limit resets (Unix timestamp)",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "aws_proxy",
+          "httpMethod": "POST",
+          "uri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:{account_id}:function:CloudOpAI-Scanner/invocations",
+          "passthroughBehavior": "when_no_match"
+        }
+      }
+    },
+    "/scan/{scanId}/status": {
+      "get": {
+        "summary": "Get scan status",
+        "description": "Retrieve the current status of a scan operation",
+        "security": [
+          {
+            "ApiKeyAuth": [],
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "description": "Unique scan identifier",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9-_]{8,64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scan status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scan not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "aws_proxy",
+          "httpMethod": "POST",
+          "uri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:{account_id}:function:CloudOpAI-StatusChecker/invocations",
+          "passthroughBehavior": "when_no_match"
+        }
+      }
+    },
+    "/report/{scanId}": {
+      "get": {
+        "summary": "Get scan report",
+        "description": "Download the detailed analysis report for a completed scan",
+        "security": [
+          {
+            "ApiKeyAuth": [],
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scanId",
+            "in": "path",
+            "required": true,
+            "description": "Unique scan identifier",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9-_]{8,64}$"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Report format",
+            "schema": {
+              "type": "string",
+              "enum": ["html", "pdf", "json"],
+              "default": "html"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Report not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "aws_proxy",
+          "httpMethod": "POST",
+          "uri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:{account_id}:function:CloudOpAI-ReportGenerator/invocations",
+          "passthroughBehavior": "when_no_match"
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "description": "Check API health status",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "healthy"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "mock",
+          "requestTemplates": {
+            "application/json": "{\"statusCode\": 200}"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseTemplates": {
+                "application/json": "{\"status\": \"healthy\", \"timestamp\": \"$context.requestTime\", \"version\": \"1.0.0\"}"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key for authentication"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token for authentication"
+      }
+    },
+    "schemas": {
+      "ScanRequest": {
+        "type": "object",
+        "required": ["account_id", "role_arn", "email"],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "pattern": "^[0-9]{12}$",
+            "description": "AWS account ID (12 digits)"
+          },
+          "role_arn": {
+            "type": "string",
+            "pattern": "^arn:aws:iam::[0-9]{12}:role/.+$",
+            "description": "IAM role ARN for cross-account access"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address for scan results"
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z]{2}-[a-z]+-[0-9]$"
+            },
+            "description": "AWS regions to scan (optional, defaults to all)",
+            "maxItems": 20
+          },
+          "notification_preferences": {
+            "type": "object",
+            "properties": {
+              "email_on_completion": {
+                "type": "boolean",
+                "default": true
+              },
+              "include_recommendations": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        }
+      },
+      "ScanResponse": {
+        "type": "object",
+        "properties": {
+          "scan_id": {
+            "type": "string",
+            "description": "Unique scan identifier"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["initiated", "in_progress", "completed", "failed"],
+            "description": "Current scan status"
+          },
+          "estimated_completion": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Estimated completion time"
+          },
+          "status_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to check scan status"
+          }
+        }
+      },
+      "ScanStatusResponse": {
+        "type": "object",
+        "properties": {
+          "scan_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["initiated", "in_progress", "completed", "failed"]
+          },
+          "progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Completion percentage"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "results_summary": {
+            "type": "object",
+            "properties": {
+              "instances_scanned": {
+                "type": "integer"
+              },
+              "total_monthly_waste": {
+                "type": "number"
+              },
+              "opportunities_found": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "ReportResponse": {
+        "type": "object",
+        "properties": {
+          "report_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Presigned URL to download report"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "URL expiration time"
+          },
+          "format": {
+            "type": "string",
+            "enum": ["html", "pdf", "json"]
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error type"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message"
+          },
+          "details": {
+            "type": "object",
+            "description": "Additional error details"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique request identifier for tracking"
+          }
+        }
+      }
+    }
+  },
+  "x-amazon-apigateway-request-validators": {
+    "Validate body, query string parameters, and headers": {
+      "validateRequestParameters": true,
+      "validateRequestBody": true
+    }
+  },
+  "x-amazon-apigateway-gateway-responses": {
+    "DEFAULT_4XX": {
+      "responseParameters": {
+        "gatewayresponse.header.Access-Control-Allow-Origin": "'*'",
+        "gatewayresponse.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+        "gatewayresponse.header.Access-Control-Allow-Methods": "'GET,POST,OPTIONS'"
+      },
+      "responseTemplates": {
+        "application/json": "{\"error\": \"$context.error.messageString\", \"request_id\": \"$context.requestId\"}"
+      }
+    },
+    "DEFAULT_5XX": {
+      "responseParameters": {
+        "gatewayresponse.header.Access-Control-Allow-Origin": "'*'"
+      },
+      "responseTemplates": {
+        "application/json": "{\"error\": \"Internal server error\", \"request_id\": \"$context.requestId\"}"
+      }
+    },
+    "THROTTLED": {
+      "statusCode": 429,
+      "responseParameters": {
+        "gatewayresponse.header.Retry-After": "'300'"
+      },
+      "responseTemplates": {
+        "application/json": "{\"error\": \"Rate limit exceeded\", \"message\": \"Too many requests\", \"request_id\": \"$context.requestId\"}"
+      }
+    }
+  }
+}

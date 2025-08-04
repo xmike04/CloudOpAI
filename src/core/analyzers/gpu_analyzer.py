@@ -2,6 +2,12 @@ import boto3
 from datetime import datetime, timedelta
 from collections import defaultdict
 import uuid
+from src.core.utils.logger import get_logger
+from src.core.utils.validators import InputValidator
+from src.core.utils.aws_errors import AWSErrorHandler
+from botocore.exceptions import ClientError
+
+logger = get_logger(__name__)
 
 class GPUAnalyzer:
     """Core GPU cost analysis engine"""
@@ -57,14 +63,37 @@ class GPUAnalyzer:
         underutilized_count = 0
         
         # Get all GPU instances
-        gpu_instances = self._get_gpu_instances()
+        try:
+            gpu_instances = self._get_gpu_instances()
+            if not gpu_instances:
+                logger.warning("No GPU instances found in account")
+        except Exception as e:
+            AWSErrorHandler.handle_ec2_error(e, "Get GPU instances")
+            return {
+                'scan_id': scan_id,
+                'scan_timestamp': datetime.now().isoformat(),
+                'total_instances_scanned': 0,
+                'total_monthly_waste': 0,
+                'idle_gpu_count': 0,
+                'underutilized_count': 0,
+                'opportunities': [],
+                'total_monthly_gpu_spend': 0
+            }
         
         for instance in gpu_instances:
             instance_id = instance['InstanceId']
             instance_type = instance['InstanceType']
             
             # Get utilization metrics
-            utilization = self._get_gpu_utilization(instance_id)
+            try:
+                utilization = self._get_gpu_utilization(instance_id)
+            except Exception as e:
+                logger.warning(f"Failed to get metrics for instance, using defaults")
+                utilization = {
+                    'avg_gpu_util': 25,  # Conservative estimate
+                    'max_gpu_util': 50,
+                    'measurement_period_hours': 24
+                }
             
             # Analyze for waste
             if utilization['avg_gpu_util'] < 5:
@@ -178,10 +207,7 @@ class GPUAnalyzer:
                     max_util = 20
                     
         except Exception as e:
-            print(f"Error getting metrics for {instance_id}: {e}")
-            # Conservative estimate if we can't get metrics
-            avg_util = 25
-            max_util = 50
+            return AWSErrorHandler.handle_cloudwatch_error(e, "Get GPU utilization")
             
         return {
             'avg_gpu_util': avg_util,

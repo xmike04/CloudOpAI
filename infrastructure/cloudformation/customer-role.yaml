@@ -21,7 +21,13 @@ Resources:
             Action: 'sts:AssumeRole'
             Condition:
               StringEquals:
-                'sts:ExternalId': !Ref AWS::StackId
+                'sts:ExternalId': 'CloudOpAI-Scanner'
+              StringLike:
+                'aws:RequestedRegion': 'us-*'
+              DateGreaterThan:
+                'aws:CurrentTime': '2024-01-01T00:00:00Z'
+              IpAddress:
+                'aws:SourceIp': ['3.80.0.0/12', '52.0.0.0/11']  # AWS US East IP ranges
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/ReadOnlyAccess'
       Policies:
@@ -41,5 +47,8 @@ Outputs:
     Description: ARN of the created role for CloudOpAI
     Value: !GetAtt CloudOpAIRole.Arn
   ExternalId:
-    Description: External ID for additional security
-    Value: !Ref AWS::StackId
+    Description: External ID for additional security (use this value when configuring CloudOpAI)
+    Value: 'CloudOpAI-Scanner'
+  SetupComplete:
+    Description: Setup completion status
+    Value: 'CloudOpAI scanner role configured successfully'

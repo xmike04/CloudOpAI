@@ -20,23 +20,84 @@ cd dist
 zip -r ../function.zip . -x "*.pyc" "__pycache__/*"
 cd ..
 
-# Create S3 bucket for reports
+# Create S3 bucket for reports with encryption
 echo "Creating S3 bucket for reports..."
 BUCKET_NAME="cloudopai-reports-${ACCOUNT_ID}"
 aws s3 mb s3://${BUCKET_NAME} --region ${AWS_REGION} 2>/dev/null || echo "Bucket already exists"
 
-# Create DynamoDB table
-echo "Creating DynamoDB table..."
+# Enable S3 bucket encryption
+echo "Enabling S3 bucket encryption..."
+aws s3api put-bucket-encryption \
+    --bucket ${BUCKET_NAME} \
+    --server-side-encryption-configuration '{
+        "Rules": [{
+            "ApplyServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+            },
+            "BucketKeyEnabled": true
+        }]
+    }' 2>/dev/null || echo "Encryption already enabled"
+
+# Block public access
+aws s3api put-public-access-block \
+    --bucket ${BUCKET_NAME} \
+    --public-access-block-configuration \
+        BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true \
+    2>/dev/null || echo "Public access already blocked"
+
+# Enable S3 versioning
+echo "Enabling S3 versioning..."
+aws s3api put-bucket-versioning \
+    --bucket ${BUCKET_NAME} \
+    --versioning-configuration Status=Enabled \
+    2>/dev/null || echo "Versioning already enabled"
+
+# Configure lifecycle policy
+echo "Configuring S3 lifecycle policy..."
+LIFECYCLE_POLICY='{
+    "Rules": [
+        {
+            "ID": "CloudOpAI-Reports-Cleanup",
+            "Status": "Enabled",
+            "Filter": {"Prefix": "reports/"},
+            "Expiration": {"Days": 90},
+            "NoncurrentVersionExpiration": {"NoncurrentDays": 30},
+            "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1}
+        }
+    ]
+}'
+
+aws s3api put-bucket-lifecycle-configuration \
+    --bucket ${BUCKET_NAME} \
+    --lifecycle-configuration "${LIFECYCLE_POLICY}" \
+    2>/dev/null || echo "Lifecycle policy already configured"
+
+# Create DynamoDB table with encryption and security features
+echo "Creating DynamoDB table with encryption..."
 aws dynamodb create-table \
     --table-name CloudOpAI-ScanResults \
     --attribute-definitions \
-        AttributeName=account_id,AttributeType=S \
+        AttributeName=account_hash,AttributeType=S \
         AttributeName=scan_timestamp,AttributeType=S \
     --key-schema \
-        AttributeName=account_id,KeyType=HASH \
+        AttributeName=account_hash,KeyType=HASH \
         AttributeName=scan_timestamp,KeyType=RANGE \
     --billing-mode PAY_PER_REQUEST \
+    --sse-specification Enabled=true,SSEType=KMS \
+    --deletion-protection-enabled \
     --region ${AWS_REGION} 2>/dev/null || echo "Table already exists"
+
+# Configure DynamoDB security features
+echo "Configuring DynamoDB security features..."
+aws dynamodb update-continuous-backups \
+    --table-name CloudOpAI-ScanResults \
+    --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true \
+    --region ${AWS_REGION} 2>/dev/null || echo "PITR already enabled"
+
+aws dynamodb update-time-to-live \
+    --table-name CloudOpAI-ScanResults \
+    --time-to-live-specification AttributeName=ttl,Enabled=true \
+    --region ${AWS_REGION} 2>/dev/null || echo "TTL already enabled"
 
 # Create Lambda execution role
 echo "Setting up IAM role..."
@@ -69,7 +130,15 @@ POLICY_DOC='{
             "Action": [
                 "sts:AssumeRole"
             ],
-            "Resource": "*"
+            "Resource": "arn:aws:iam::*:role/CloudOpAI-Scanner-Role",
+            "Condition": {
+                "StringEquals": {
+                    "sts:ExternalId": "CloudOpAI-Scanner"
+                },
+                "StringLike": {
+                    "aws:RequestedRegion": "us-*"
+                }
+            }
         },
         {
             "Effect": "Allow",
@@ -93,7 +162,10 @@ POLICY_DOC='{
             "Action": [
                 "ses:SendEmail"
             ],
-            "Resource": "*"
+            "Resource": [
+                "arn:aws:ses:${AWS_REGION}:${ACCOUNT_ID}:identity/alerts@cloudopai.com",
+                "arn:aws:ses:${AWS_REGION}:${ACCOUNT_ID}:identity/cloudopai.com"
+            ]
         }
     ]
 }'
@@ -127,8 +199,8 @@ if aws lambda get-function --function-name ${FUNCTION_NAME} --region ${AWS_REGIO
             SCAN_RESULTS_TABLE=CloudOpAI-ScanResults,
             REPORTS_BUCKET=${BUCKET_NAME},
             AWS_REGION=${AWS_REGION},
-            EMAIL_SOURCE=alerts@cloudopai.com,
-            CALENDLY_LINK=https://calendly.com/cloudopai/demo
+            EMAIL_SOURCE=\${EMAIL_SOURCE:-alerts@cloudopai.com},
+            CALENDLY_LINK=\${CALENDLY_LINK:-https://calendly.com/cloudopai/demo}
         }" \
         --region ${AWS_REGION}
 else
@@ -144,8 +216,8 @@ else
             SCAN_RESULTS_TABLE=CloudOpAI-ScanResults,
             REPORTS_BUCKET=${BUCKET_NAME},
             AWS_REGION=${AWS_REGION},
-            EMAIL_SOURCE=alerts@cloudopai.com,
-            CALENDLY_LINK=https://calendly.com/cloudopai/demo
+            EMAIL_SOURCE=\${EMAIL_SOURCE:-alerts@cloudopai.com},
+            CALENDLY_LINK=\${CALENDLY_LINK:-https://calendly.com/cloudopai/demo}
         }" \
         --zip-file fileb://function.zip \
         --region ${AWS_REGION}

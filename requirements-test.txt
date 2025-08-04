@@ -1,0 +1,58 @@
+# Testing dependencies for CloudOpAI security tests
+
+# Core testing framework
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+pytest-timeout>=2.1.0
+pytest-xdist>=3.0.0
+pytest-html>=3.1.0
+
+# AWS service mocking
+moto[all]>=4.2.0
+boto3>=1.26.0
+botocore>=1.29.0
+
+# Security testing utilities
+cryptography>=3.4.8
+PyJWT>=2.6.0
+bcrypt>=4.0.0
+passlib>=1.7.4
+
+# HTTP and API testing
+requests>=2.28.0
+responses>=0.22.0
+httpx>=0.24.0
+
+# Data validation and serialization
+marshmallow>=3.19.0
+cerberus>=1.3.4
+jsonschema>=4.17.0
+
+# Utilities
+faker>=15.0.0
+factory-boy>=3.2.0
+freezegun>=1.2.0
+parameterized>=0.8.1
+
+# Performance testing
+pytest-benchmark>=4.0.0
+memory-profiler>=0.60.0
+
+# Security specific testing
+bandit>=1.7.4
+safety>=2.3.0
+semgrep>=1.0.0
+
+# Code quality
+flake8>=6.0.0
+black>=22.0.0
+isort>=5.11.0
+mypy>=1.0.0
+
+# Documentation testing
+pytest-doctestplus>=0.12.0
+
+# Reporting
+pytest-json-report>=1.5.0
+coverage[toml]>=7.0.0

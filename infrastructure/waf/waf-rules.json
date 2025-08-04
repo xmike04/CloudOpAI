@@ -1,0 +1,570 @@
+{
+  "Name": "CloudOpAI-WAF-WebACL",
+  "Description": "WAF rules for CloudOpAI API protection",
+  "Scope": "REGIONAL",
+  "DefaultAction": {
+    "Allow": {}
+  },
+  "Rules": [
+    {
+      "Name": "AWS-AWSManagedRulesCommonRuleSet",
+      "Priority": 1,
+      "OverrideAction": {
+        "None": {}
+      },
+      "Statement": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesCommonRuleSet",
+          "ExcludedRules": [
+            {
+              "Name": "SizeRestrictions_BODY"
+            }
+          ]
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "CommonRuleSetMetric"
+      }
+    },
+    {
+      "Name": "AWS-AWSManagedRulesKnownBadInputsRuleSet",
+      "Priority": 2,
+      "OverrideAction": {
+        "None": {}
+      },
+      "Statement": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesKnownBadInputsRuleSet"
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "KnownBadInputsMetric"
+      }
+    },
+    {
+      "Name": "AWS-AWSManagedRulesAmazonIpReputationList",
+      "Priority": 3,
+      "OverrideAction": {
+        "None": {}
+      },
+      "Statement": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesAmazonIpReputationList"
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "IpReputationMetric"
+      }
+    },
+    {
+      "Name": "AWS-AWSManagedRulesAnonymousIpList",
+      "Priority": 4,
+      "OverrideAction": {
+        "None": {}
+      },
+      "Statement": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesAnonymousIpList"
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "AnonymousIpMetric"
+      }
+    },
+    {
+      "Name": "CloudOpAI-RateLimitRule",
+      "Priority": 10,
+      "Action": {
+        "Block": {}
+      },
+      "Statement": {
+        "RateBasedStatement": {
+          "Limit": 2000,
+          "AggregateKeyType": "IP",
+          "ScopeDownStatement": {
+            "ByteMatchStatement": {
+              "SearchString": "/v1/",
+              "FieldToMatch": {
+                "UriPath": {}
+              },
+              "TextTransformations": [
+                {
+                  "Priority": 0,
+                  "Type": "LOWERCASE"
+                }
+              ],
+              "PositionalConstraint": "STARTS_WITH"
+            }
+          }
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "RateLimitMetric"
+      }
+    },
+    {
+      "Name": "CloudOpAI-AuthenticatedRateLimit",
+      "Priority": 11,
+      "Action": {
+        "Block": {}
+      },
+      "Statement": {
+        "RateBasedStatement": {
+          "Limit": 5000,
+          "AggregateKeyType": "CUSTOM_KEYS",
+          "CustomKeys": [
+            {
+              "Name": "ApiKeyHeader",
+              "Header": {
+                "Name": "x-api-key",
+                "TextTransformations": [
+                  {
+                    "Priority": 0,
+                    "Type": "LOWERCASE"
+                  }
+                ]
+              }
+            }
+          ],
+          "ScopeDownStatement": {
+            "AndStatement": {
+              "Statements": [
+                {
+                  "ByteMatchStatement": {
+                    "SearchString": "/v1/",
+                    "FieldToMatch": {
+                      "UriPath": {}
+                    },
+                    "TextTransformations": [
+                      {
+                        "Priority": 0,
+                        "Type": "LOWERCASE"
+                      }
+                    ],
+                    "PositionalConstraint": "STARTS_WITH"
+                  }
+                },
+                {
+                  "SizeConstraintStatement": {
+                    "FieldToMatch": {
+                      "SingleHeader": {
+                        "Name": "x-api-key"
+                      }
+                    },
+                    "ComparisonOperator": "GT",
+                    "Size": 0,
+                    "TextTransformations": [
+                      {
+                        "Priority": 0,
+                        "Type": "NONE"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "AuthenticatedRateLimitMetric"
+      }
+    },
+    {
+      "Name": "CloudOpAI-SQLInjectionProtection",
+      "Priority": 20,
+      "Action": {
+        "Block": {}
+      },
+      "Statement": {
+        "OrStatement": {
+          "Statements": [
+            {
+              "SqliMatchStatement": {
+                "FieldToMatch": {
+                  "Body": {
+                    "OversizeHandling": "CONTINUE"
+                  }
+                },
+                "TextTransformations": [
+                  {
+                    "Priority": 1,
+                    "Type": "URL_DECODE"
+                  },
+                  {
+                    "Priority": 2,
+                    "Type": "HTML_ENTITY_DECODE"
+                  }
+                ],
+                "SensitivityLevel": "HIGH"
+              }
+            },
+            {
+              "SqliMatchStatement": {
+                "FieldToMatch": {
+                  "AllQueryArguments": {}
+                },
+                "TextTransformations": [
+                  {
+                    "Priority": 1,
+                    "Type": "URL_DECODE"
+                  },
+                  {
+                    "Priority": 2,
+                    "Type": "HTML_ENTITY_DECODE"
+                  }
+                ],
+                "SensitivityLevel": "HIGH"
+              }
+            }
+          ]
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "SQLInjectionMetric"
+      }
+    },
+    {
+      "Name": "CloudOpAI-XSSProtection",
+      "Priority": 21,
+      "Action": {
+        "Block": {}
+      },
+      "Statement": {
+        "OrStatement": {
+          "Statements": [
+            {
+              "XssMatchStatement": {
+                "FieldToMatch": {
+                  "Body": {
+                    "OversizeHandling": "CONTINUE"
+                  }
+                },
+                "TextTransformations": [
+                  {
+                    "Priority": 1,
+                    "Type": "URL_DECODE"
+                  },
+                  {
+                    "Priority": 2,
+                    "Type": "HTML_ENTITY_DECODE"
+                  }
+                ]
+              }
+            },
+            {
+              "XssMatchStatement": {
+                "FieldToMatch": {
+                  "AllQueryArguments": {}
+                },
+                "TextTransformations": [
+                  {
+                    "Priority": 1,
+                    "Type": "URL_DECODE"
+                  },
+                  {
+                    "Priority": 2,
+                    "Type": "HTML_ENTITY_DECODE"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "XSSProtectionMetric"
+      }
+    },
+    {
+      "Name": "CloudOpAI-SizeRestrictions",
+      "Priority": 22,
+      "Action": {
+        "Block": {}
+      },
+      "Statement": {
+        "OrStatement": {
+          "Statements": [
+            {
+              "SizeConstraintStatement": {
+                "FieldToMatch": {
+                  "Body": {}
+                },
+                "ComparisonOperator": "GT",
+                "Size": 1048576,
+                "TextTransformations": [
+                  {
+                    "Priority": 0,
+                    "Type": "NONE"
+                  }
+                ]
+              }
+            },
+            {
+              "SizeConstraintStatement": {
+                "FieldToMatch": {
+                  "SingleHeader": {
+                    "Name": "authorization"
+                  }
+                },
+                "ComparisonOperator": "GT",
+                "Size": 4096,
+                "TextTransformations": [
+                  {
+                    "Priority": 0,
+                    "Type": "NONE"
+                  }
+                ]
+              }
+            },
+            {
+              "SizeConstraintStatement": {
+                "FieldToMatch": {
+                  "UriPath": {}
+                },
+                "ComparisonOperator": "GT",
+                "Size": 2048,
+                "TextTransformations": [
+                  {
+                    "Priority": 0,
+                    "Type": "NONE"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "SizeRestrictionsMetric"
+      }
+    },
+    {
+      "Name": "CloudOpAI-GeoRestrictions",
+      "Priority": 30,
+      "Action": {
+        "Block": {}
+      },
+      "Statement": {
+        "NotStatement": {
+          "Statement": {
+            "GeoMatchStatement": {
+              "CountryCodes": [
+                "US",
+                "CA",
+                "GB",
+                "DE",
+                "FR",
+                "AU",
+                "JP",
+                "SG"
+              ]
+            }
+          }
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "GeoRestrictionsMetric"
+      }
+    },
+    {
+      "Name": "CloudOpAI-InvalidUserAgent",
+      "Priority": 31,
+      "Action": {
+        "Block": {}
+      },
+      "Statement": {
+        "OrStatement": {
+          "Statements": [
+            {
+              "NotStatement": {
+                "Statement": {
+                  "SizeConstraintStatement": {
+                    "FieldToMatch": {
+                      "SingleHeader": {
+                        "Name": "user-agent"
+                      }
+                    },
+                    "ComparisonOperator": "GT",
+                    "Size": 0,
+                    "TextTransformations": [
+                      {
+                        "Priority": 0,
+                        "Type": "NONE"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ByteMatchStatement": {
+                "SearchString": "bot",
+                "FieldToMatch": {
+                  "SingleHeader": {
+                    "Name": "user-agent"
+                  }
+                },
+                "TextTransformations": [
+                  {
+                    "Priority": 0,
+                    "Type": "LOWERCASE"
+                  }
+                ],
+                "PositionalConstraint": "CONTAINS"
+              }
+            },
+            {
+              "ByteMatchStatement": {
+                "SearchString": "crawler",
+                "FieldToMatch": {
+                  "SingleHeader": {
+                    "Name": "user-agent"
+                  }
+                },
+                "TextTransformations": [
+                  {
+                    "Priority": 0,
+                    "Type": "LOWERCASE"
+                  }
+                ],
+                "PositionalConstraint": "CONTAINS"
+              }
+            },
+            {
+              "ByteMatchStatement": {
+                "SearchString": "scanner",
+                "FieldToMatch": {
+                  "SingleHeader": {
+                    "Name": "user-agent"
+                  }
+                },
+                "TextTransformations": [
+                  {
+                    "Priority": 0,
+                    "Type": "LOWERCASE"
+                  }
+                ],
+                "PositionalConstraint": "CONTAINS"
+              }
+            }
+          ]
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "InvalidUserAgentMetric"
+      }
+    },
+    {
+      "Name": "CloudOpAI-MethodRestrictions",
+      "Priority": 32,
+      "Action": {
+        "Block": {}
+      },
+      "Statement": {
+        "NotStatement": {
+          "Statement": {
+            "ByteMatchStatement": {
+              "SearchString": "GET,POST,OPTIONS",
+              "FieldToMatch": {
+                "Method": {}
+              },
+              "TextTransformations": [
+                {
+                  "Priority": 0,
+                  "Type": "NONE"
+                }
+              ],
+              "PositionalConstraint": "CONTAINS"
+            }
+          }
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "MethodRestrictionsMetric"
+      }
+    },
+    {
+      "Name": "CloudOpAI-WhitelistCloudFront",
+      "Priority": 5,
+      "Action": {
+        "Allow": {}
+      },
+      "Statement": {
+        "ByteMatchStatement": {
+          "SearchString": "Amazon CloudFront",
+          "FieldToMatch": {
+            "SingleHeader": {
+              "Name": "user-agent"
+            }
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "NONE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "CloudFrontWhitelistMetric"
+      }
+    }
+  ],
+  "VisibilityConfig": {
+    "SampledRequestsEnabled": true,
+    "CloudWatchMetricsEnabled": true,
+    "MetricName": "CloudOpAI-WAF-WebACL"
+  },
+  "CustomResponseBodies": {
+    "CloudOpAI-BlockedResponse": {
+      "ContentType": "APPLICATION_JSON",
+      "Content": "{\"error\": \"Request blocked by security policy\", \"message\": \"Your request has been blocked due to security restrictions. Please contact support if you believe this is an error.\", \"support\": \"support@cloudopai.com\"}"
+    }
+  },
+  "Tags": [
+    {
+      "Key": "Application",
+      "Value": "CloudOpAI"
+    },
+    {
+      "Key": "Purpose",
+      "Value": "API-Protection"
+    },
+    {
+      "Key": "Environment",
+      "Value": "Production"
+    }
+  ]
+}

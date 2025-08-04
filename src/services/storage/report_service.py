@@ -4,8 +4,10 @@ import json
 from datetime import datetime
 from typing import Dict, Any
 
-from src.config.settings import REPORTS_BUCKET, AWS_REGION
+from src.config.secure_settings import REPORTS_BUCKET, AWS_REGION, CALENDLY_LINK
 from src.core.models.scan_result import ScanResult
+from src.core.utils.security_validators import SecurityValidator
+from src.core.utils.s3_security import S3SecurityManager
 
 
 class ReportService:
@@ -27,14 +29,19 @@ class ReportService:
         # Generate HTML content
         html_content = self._create_html_report(scan_result)
         
-        # Upload to S3
-        report_key = f"reports/{scan_result.account_id}/{scan_result.scan_id}.html"
+        # Upload to S3 with secure key generation
+        report_key = SecurityValidator.create_secure_s3_key(
+            scan_result.account_id, 
+            scan_result.scan_id, 
+            'html'
+        )
         
         self.s3_client.put_object(
             Bucket=REPORTS_BUCKET,
             Key=report_key,
             Body=html_content,
             ContentType='text/html',
+            CacheControl='no-cache, no-store, must-revalidate',
             Metadata={
                 'account_id': scan_result.account_id,
                 'scan_timestamp': scan_result.scan_timestamp.isoformat(),
@@ -42,12 +49,9 @@ class ReportService:
             }
         )
         
-        # Generate presigned URL (7 days validity)
-        url = self.s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': REPORTS_BUCKET, 'Key': report_key},
-            ExpiresIn=604800
-        )
+        # Generate secure presigned URL (1 hour validity)
+        s3_security = S3SecurityManager(REPORTS_BUCKET)
+        url = s3_security.generate_secure_presigned_url(report_key, expiration=3600)
         
         return url
     
@@ -59,6 +63,11 @@ class ReportService:
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta http-equiv="X-Content-Type-Options" content="nosniff">
+            <meta http-equiv="X-Frame-Options" content="DENY">
+            <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+            <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'none';">
             <title>CloudOpAI GPU Cost Analysis - {scan_result.account_id}</title>
             <style>
                 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -162,7 +171,7 @@ class ReportService:
                 <div class="header">
                     <h1>GPU Cost Analysis Report</h1>
                     <p>Generated on {scan_result.scan_timestamp.strftime('%B %d, %Y at %I:%M %p UTC')}</p>
-                    <p>Account: {scan_result.account_id}</p>
+                    <p>Account: {SecurityValidator.sanitize_html_content(f'****{scan_result.account_id[-4:]}')}</p>
                 </div>
                 
                 <div class="summary-grid">
@@ -203,7 +212,7 @@ class ReportService:
         for opp in scan_result.opportunities:
             html += f"""
                             <tr>
-                                <td><code>{opp.instance_id}</code></td>
+                                <td><code>{SecurityValidator.sanitize_html_content(opp.instance_id[:8] + '****')}</code></td>
                                 <td>{opp.instance_type}</td>
                                 <td>{opp.issue.value.replace('_', ' ').title()}</td>
                                 <td>{opp.utilization:.1f}%</td>
@@ -224,8 +233,8 @@ class ReportService:
         for opp in scan_result.opportunities:
             html += f"""
                 <div class="recommendation">
-                    <strong>{opp.instance_id} ({opp.instance_type})</strong><br>
-                    {opp.recommendation}<br>
+                    <strong>{SecurityValidator.sanitize_html_content(opp.instance_id[:8] + '****')} ({SecurityValidator.sanitize_html_content(opp.instance_type)})</strong><br>
+                    {SecurityValidator.sanitize_html_content(opp.recommendation)}<br>
                     <em>Monthly Savings: ${opp.potential_savings:,.2f}</em>
                 </div>
             """
@@ -235,7 +244,7 @@ class ReportService:
                     <h2>Ready to Implement These Savings?</h2>
                     <p>CloudOpAI can automatically optimize your GPU infrastructure and start saving you money immediately.</p>
                     <p><strong>Total identified savings: ${scan_result.total_monthly_waste:,.2f}/month</strong></p>
-                    <a href="https://calendly.com/cloudopai/demo" class="cta-button">Schedule Demo</a>
+                    <a href="{CALENDLY_LINK}" class="cta-button">Schedule Demo</a>
                 </div>
             </div>
         </body>

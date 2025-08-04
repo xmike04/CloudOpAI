@@ -1,0 +1,446 @@
+{
+  "VPCConfiguration": {
+    "VpcId": "vpc-cloudopai",
+    "CidrBlock": "10.0.0.0/16",
+    "EnableDnsHostnames": true,
+    "EnableDnsSupport": true,
+    "Tags": [
+      {
+        "Key": "Name",
+        "Value": "CloudOpAI-VPC"
+      },
+      {
+        "Key": "Application",
+        "Value": "CloudOpAI"
+      },
+      {
+        "Key": "Purpose",
+        "Value": "SecureCompute"
+      }
+    ]
+  },
+  "Subnets": {
+    "PrivateSubnets": [
+      {
+        "SubnetId": "subnet-cloudopai-private-1a",
+        "AvailabilityZone": "us-east-1a",
+        "CidrBlock": "10.0.1.0/24",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CloudOpAI-Private-Subnet-1A"
+          },
+          {
+            "Key": "Type",
+            "Value": "Private"
+          }
+        ]
+      },
+      {
+        "SubnetId": "subnet-cloudopai-private-1b",
+        "AvailabilityZone": "us-east-1b",
+        "CidrBlock": "10.0.2.0/24",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CloudOpAI-Private-Subnet-1B"
+          },
+          {
+            "Key": "Type",
+            "Value": "Private"
+          }
+        ]
+      },
+      {
+        "SubnetId": "subnet-cloudopai-private-1c",
+        "AvailabilityZone": "us-east-1c",
+        "CidrBlock": "10.0.3.0/24",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CloudOpAI-Private-Subnet-1C"
+          },
+          {
+            "Key": "Type",
+            "Value": "Private"
+          }
+        ]
+      }
+    ],
+    "PublicSubnets": [
+      {
+        "SubnetId": "subnet-cloudopai-public-1a",
+        "AvailabilityZone": "us-east-1a",
+        "CidrBlock": "10.0.101.0/24",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CloudOpAI-Public-Subnet-1A"
+          },
+          {
+            "Key": "Type",
+            "Value": "Public"
+          }
+        ]
+      },
+      {
+        "SubnetId": "subnet-cloudopai-public-1b",
+        "AvailabilityZone": "us-east-1b",
+        "CidrBlock": "10.0.102.0/24",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CloudOpAI-Public-Subnet-1B"
+          },
+          {
+            "Key": "Type",
+            "Value": "Public"
+          }
+        ]
+      }
+    ]
+  },
+  "SecurityGroups": [
+    {
+      "GroupName": "CloudOpAI-Lambda-SG",
+      "Description": "Security group for CloudOpAI Lambda functions",
+      "Rules": {
+        "Ingress": [],
+        "Egress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrBlocks": ["0.0.0.0/0"],
+            "Description": "HTTPS outbound for AWS API calls"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 53,
+            "ToPort": 53,
+            "CidrBlocks": ["0.0.0.0/0"],
+            "Description": "DNS resolution"
+          },
+          {
+            "IpProtocol": "udp",
+            "FromPort": 53,
+            "ToPort": 53,
+            "CidrBlocks": ["0.0.0.0/0"],
+            "Description": "DNS resolution"
+          }
+        ]
+      },
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-Lambda-SecurityGroup"
+        },
+        {
+          "Key": "Purpose",
+          "Value": "Lambda-Network-Security"
+        }
+      ]
+    },
+    {
+      "GroupName": "CloudOpAI-VPC-Endpoints-SG",
+      "Description": "Security group for VPC endpoints",
+      "Rules": {
+        "Ingress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "SourceSecurityGroupName": "CloudOpAI-Lambda-SG",
+            "Description": "HTTPS from Lambda functions"
+          }
+        ],
+        "Egress": []
+      },
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-VPC-Endpoints-SecurityGroup"
+        },
+        {
+          "Key": "Purpose",
+          "Value": "VPC-Endpoints-Security"
+        }
+      ]
+    }
+  ],
+  "VPCEndpoints": [
+    {
+      "ServiceName": "com.amazonaws.us-east-1.s3",
+      "VpcEndpointType": "Gateway",
+      "RouteTableIds": ["rtb-cloudopai-private"],
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-S3-VPC-Endpoint"
+        }
+      ]
+    },
+    {
+      "ServiceName": "com.amazonaws.us-east-1.dynamodb",
+      "VpcEndpointType": "Gateway",
+      "RouteTableIds": ["rtb-cloudopai-private"],
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-DynamoDB-VPC-Endpoint"
+        }
+      ]
+    },
+    {
+      "ServiceName": "com.amazonaws.us-east-1.secretsmanager",
+      "VpcEndpointType": "Interface",
+      "SubnetIds": [
+        "subnet-cloudopai-private-1a",
+        "subnet-cloudopai-private-1b",
+        "subnet-cloudopai-private-1c"
+      ],
+      "SecurityGroupIds": ["CloudOpAI-VPC-Endpoints-SG"],
+      "PrivateDnsEnabled": true,
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-SecretsManager-VPC-Endpoint"
+        }
+      ]
+    },
+    {
+      "ServiceName": "com.amazonaws.us-east-1.kms",
+      "VpcEndpointType": "Interface",
+      "SubnetIds": [
+        "subnet-cloudopai-private-1a",
+        "subnet-cloudopai-private-1b",
+        "subnet-cloudopai-private-1c"
+      ],
+      "SecurityGroupIds": ["CloudOpAI-VPC-Endpoints-SG"],
+      "PrivateDnsEnabled": true,
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-KMS-VPC-Endpoint"
+        }
+      ]
+    },
+    {
+      "ServiceName": "com.amazonaws.us-east-1.logs",
+      "VpcEndpointType": "Interface",
+      "SubnetIds": [
+        "subnet-cloudopai-private-1a",
+        "subnet-cloudopai-private-1b",
+        "subnet-cloudopai-private-1c"
+      ],
+      "SecurityGroupIds": ["CloudOpAI-VPC-Endpoints-SG"],
+      "PrivateDnsEnabled": true,
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-CloudWatchLogs-VPC-Endpoint"
+        }
+      ]
+    },
+    {
+      "ServiceName": "com.amazonaws.us-east-1.monitoring",
+      "VpcEndpointType": "Interface",
+      "SubnetIds": [
+        "subnet-cloudopai-private-1a",
+        "subnet-cloudopai-private-1b",
+        "subnet-cloudopai-private-1c"
+      ],
+      "SecurityGroupIds": ["CloudOpAI-VPC-Endpoints-SG"],
+      "PrivateDnsEnabled": true,
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-CloudWatch-VPC-Endpoint"
+        }
+      ]
+    },
+    {
+      "ServiceName": "com.amazonaws.us-east-1.sts",
+      "VpcEndpointType": "Interface",
+      "SubnetIds": [
+        "subnet-cloudopai-private-1a",
+        "subnet-cloudopai-private-1b",
+        "subnet-cloudopai-private-1c"
+      ],
+      "SecurityGroupIds": ["CloudOpAI-VPC-Endpoints-SG"],
+      "PrivateDnsEnabled": true,
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-STS-VPC-Endpoint"
+        }
+      ]
+    }
+  ],
+  "RouteTables": [
+    {
+      "RouteTableId": "rtb-cloudopai-private",
+      "Routes": [
+        {
+          "DestinationCidrBlock": "10.0.0.0/16",
+          "Target": "local"
+        },
+        {
+          "DestinationCidrBlock": "0.0.0.0/0",
+          "NatGatewayId": "nat-cloudopai"
+        }
+      ],
+      "SubnetAssociations": [
+        "subnet-cloudopai-private-1a",
+        "subnet-cloudopai-private-1b",
+        "subnet-cloudopai-private-1c"
+      ],
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-Private-RouteTable"
+        }
+      ]
+    },
+    {
+      "RouteTableId": "rtb-cloudopai-public",
+      "Routes": [
+        {
+          "DestinationCidrBlock": "10.0.0.0/16",
+          "Target": "local"
+        },
+        {
+          "DestinationCidrBlock": "0.0.0.0/0",
+          "InternetGatewayId": "igw-cloudopai"
+        }
+      ],
+      "SubnetAssociations": [
+        "subnet-cloudopai-public-1a",
+        "subnet-cloudopai-public-1b"
+      ],
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-Public-RouteTable"
+        }
+      ]
+    }
+  ],
+  "InternetGateway": {
+    "InternetGatewayId": "igw-cloudopai",
+    "Tags": [
+      {
+        "Key": "Name",
+        "Value": "CloudOpAI-Internet-Gateway"
+      }
+    ]
+  },
+  "NATGateway": {
+    "NatGatewayId": "nat-cloudopai",
+    "SubnetId": "subnet-cloudopai-public-1a",
+    "AllocationId": "eip-cloudopai",
+    "Tags": [
+      {
+        "Key": "Name",
+        "Value": "CloudOpAI-NAT-Gateway"
+      }
+    ]
+  },
+  "ElasticIP": {
+    "AllocationId": "eip-cloudopai",
+    "Domain": "vpc",
+    "Tags": [
+      {
+        "Key": "Name",
+        "Value": "CloudOpAI-NAT-EIP"
+      }
+    ]
+  },
+  "LambdaVPCConfiguration": {
+    "SubnetIds": [
+      "subnet-cloudopai-private-1a",
+      "subnet-cloudopai-private-1b",
+      "subnet-cloudopai-private-1c"
+    ],
+    "SecurityGroupIds": [
+      "CloudOpAI-Lambda-SG"
+    ]
+  },
+  "NetworkACLs": [
+    {
+      "NetworkAclId": "acl-cloudopai-private",
+      "Rules": [
+        {
+          "RuleNumber": 100,
+          "Protocol": "-1",
+          "RuleAction": "allow",
+          "CidrBlock": "10.0.0.0/16"
+        },
+        {
+          "RuleNumber": 110,
+          "Protocol": "tcp",
+          "RuleAction": "allow",
+          "CidrBlock": "0.0.0.0/0",
+          "PortRange": {
+            "From": 443,
+            "To": 443
+          }
+        },
+        {
+          "RuleNumber": 120,
+          "Protocol": "tcp",
+          "RuleAction": "allow",
+          "CidrBlock": "0.0.0.0/0",
+          "PortRange": {
+            "From": 1024,
+            "To": 65535
+          }
+        },
+        {
+          "RuleNumber": 32767,
+          "Protocol": "-1",
+          "RuleAction": "deny",
+          "CidrBlock": "0.0.0.0/0"
+        }
+      ],
+      "SubnetAssociations": [
+        "subnet-cloudopai-private-1a",
+        "subnet-cloudopai-private-1b",
+        "subnet-cloudopai-private-1c"
+      ],
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "CloudOpAI-Private-NACL"
+        }
+      ]
+    }
+  ],
+  "FlowLogs": {
+    "FlowLogId": "fl-cloudopai-vpc",
+    "ResourceType": "VPC",
+    "ResourceId": "vpc-cloudopai",
+    "TrafficType": "ALL",
+    "LogDestinationType": "cloud-watch-logs",
+    "LogGroupName": "/aws/vpc/cloudopai/flowlogs",
+    "DeliverLogsPermissionArn": "arn:aws:iam::ACCOUNT_ID:role/flowlogsRole",
+    "Tags": [
+      {
+        "Key": "Name",
+        "Value": "CloudOpAI-VPC-FlowLogs"
+      }
+    ]
+  },
+  "SecurityConfiguration": {
+    "EnableGuardDuty": true,
+    "EnableVPCFlowLogs": true,
+    "EnableCloudTrail": true,
+    "DDoSProtection": "Advanced",
+    "EncryptionInTransit": true,
+    "PrivateSubnetsOnly": true,
+    "NATGatewayHighAvailability": false,
+    "VPCEndpointsRequired": true
+  }
+}
