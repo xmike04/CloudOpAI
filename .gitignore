@@ -1,5 +1,25 @@
 CLAUDE.md
 
+# Claude AI settings and memory
+.claude/
+.claude/**
+
+# Python virtual environments
+.venv/
+.env/
+venv/
+env/
+
+# Incident response and security documentation (keep private)
+incident_response/
+security_runbooks/
+emergency_procedures/
+
+# Infrastructure secrets and deployment scripts
+infrastructure/scripts/setup-secrets.sh
+infrastructure/scripts/deploy-secrets.sh
+infrastructure/scripts/production-deploy.sh
+
 # AWS Credentials and Secrets
 .aws/
 *.pem
