@@ -15,6 +15,10 @@ incident_response/
 security_runbooks/
 emergency_procedures/
 
+# Sensitive incident response implementation
+src/core/incident_response/
+src/core/compliance/
+
 # Infrastructure secrets and deployment scripts
 infrastructure/scripts/setup-secrets.sh
 infrastructure/scripts/deploy-secrets.sh
