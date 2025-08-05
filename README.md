@@ -20,3 +20,7 @@ This repository contains the public implementation of CloudOpAI's security infra
 3. Run tests: `pytest`
 
 For production deployment and incident response procedures, refer to private documentation.
+
+## Author
+
+**Michael Marin** - Software Engineer specializing in cloud security and GPU optimization solutions.

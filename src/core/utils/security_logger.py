@@ -1,4 +1,7 @@
-"""Comprehensive security logging and monitoring system"""
+"""Comprehensive security logging and monitoring system
+
+Author: Michael Marin
+"""
 import json
 import uuid
 import time

@@ -1,4 +1,7 @@
-"""CloudTrail audit logging integration for CloudOpAI"""
+"""CloudTrail audit logging integration for CloudOpAI
+
+Author: Michael Marin
+"""
 import json
 import uuid
 import boto3
